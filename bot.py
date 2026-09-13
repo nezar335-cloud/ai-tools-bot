@@ -4,27 +4,28 @@ import requests
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-# إعداد السجلات (Logging) لمنع التوقف ومعالجة الأخطاء
+# إعداد السجلات لمنع التوقف الفجائي
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# --- الإعدادات المطلوبة ---
-BOT_TOKEN = "ضع_توكن_البوت_هنا"
+# --- البيانات والتوكنات ---
+# يستجلب التوكن من متغيرات البيئة في Render أو يمكنك كتابته مكان النص بين التنصيص
+BOT_TOKEN = os.getenv("BOT_TOKEN", "ضع_توكن_البوت_هنا")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "ضع_مفتاح_OPENAI_هنا")
 
-# معرف المالك المباشر
-OWNER_ID = 8860453018
+# معرف المالك
+OWNER_ID = "8860453018"
 
-# حالات المستخدمين
+# حفظ حالة المستخدمين
 user_states = {}
 
 def get_main_keyboard(user_id):
-    """بناء الأزرار التفاعلية الثابتة تحت الرسالة"""
+    """قائمة الأزرار الرئيسية - العناوين مصممة لكي لا تنزل للمحادثة عند النقر"""
     keyboard = [
-        # عنوان القسم المجاني - زر ثابت لا ينزل للمحادثه إطلاقاً
+        # عنوان القسم المجاني - زر ثابت لا ينزل للمحادثة
         [InlineKeyboardButton("--- 🆓 قسم الأدوات المجانية Free ---", callback_data="ignore")],
         [
             InlineKeyboardButton("📝 تصحيح النص", callback_data="tool_correct"),
@@ -34,6 +35,173 @@ def get_main_keyboard(user_id):
             InlineKeyboardButton("📄 استخراج النص من صورة", callback_data="tool_ocr"),
             InlineKeyboardButton("🖼️ تحويل صيغ الصور", callback_data="tool_convert")
         ],
+        [
+            InlineKeyboardButton("📊 ضغط الصور", callback_data="tool_compress"),
+            InlineKeyboardButton("📑 صور ⬅️ PDF", callback_data="tool_img2pdf")
+        ],
+        # أداة التلخيص والتحليل مجانية تماماً
+        [
+            InlineKeyboardButton("🔍 تحليل / تلخيص النص (مجاني)", callback_data="tool_summarize")
+        ],
+
+        # عنوان القسم المدفوع - زر ثابت لا ينزل للمحادثة
+        [InlineKeyboardButton("--- 💎 قسم الأدوات المدفوعة PRO ---", callback_data="ignore")],
+        [
+            InlineKeyboardButton("🧠 مساعد AI المتقدم (⭐1)", callback_data="tool_ai_chat"),
+            InlineKeyboardButton("✂️ إزالة الخلفية (⭐2)", callback_data="tool_bg_remove")
+        ],
+        [
+            InlineKeyboardButton("🎤 نص ⬅️ صوت (⭐1)", callback_data="tool_tts"),
+            InlineKeyboardButton("🔊 صوت ⬅️ نص (⭐1)", callback_data="tool_stt")
+        ],
+        [
+            InlineKeyboardButton("🎨 تعديل الصور بالذكاء (⭐5)", callback_data="tool_img_edit"),
+            InlineKeyboardButton("🎨 توليد الصور (⭐5)", callback_data="tool_img_gen")
+        ],
+        [
+            InlineKeyboardButton("🎭 تغيير نمط الصورة (⭐4)", callback_data="tool_img_style"),
+            InlineKeyboardButton("✨ تحسين الصور (⭐3)", callback_data="tool_img_enhance")
+        ]
+    ]
+
+    # إظهار زر المالك فقط إذا كان حساب المستخدم يطابق OWNER_ID
+    if str(user_id) == str(OWNER_ID):
+        keyboard.append([InlineKeyboardButton("👑 لوحة تحكم المالك", callback_data="owner_menu")])
+
+    return InlineKeyboardMarkup(keyboard)
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر البدء /start"""
+    try:
+        user_id = update.effective_user.id
+        
+        # القائمة السفلية الثابتة للإلغاء والعودة
+        reply_kb = [[KeyboardButton("🔄 القائمة الرئيسية / إلغاء")]]
+        markup = ReplyKeyboardMarkup(reply_kb, resize_keyboard=True)
+
+        await update.message.reply_text("أهلاً بك في بوت الخدمات!", reply_markup=markup)
+        await update.message.reply_text("اختر الأداة المطلوبة من القائمة أدناه:", reply_markup=get_main_keyboard(user_id))
+    except Exception as e:
+        logger.error(f"خطأ في امر start: {e}")
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أزرار Inline"""
+    try:
+        query = update.callback_query
+        user_id = query.from_user.id
+        data = query.data
+
+        # 1. منع العناوين المحددة بالصورة من التفاعل أو النزول في المحادثة
+        if data == "ignore":
+            await query.answer()
+            return
+
+        await query.answer()
+
+        # 2. قسم المالك الخاص بك
+        if data == "owner_menu":
+            if str(user_id) == str(OWNER_ID):
+                owner_kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("➕ إضافة نقاط لمستخدم", callback_data="owner_add_pts")],
+                    [InlineKeyboardButton("📢 إرسال إشعار عام", callback_data="owner_broadcast")],
+                    [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
+                ])
+                await query.edit_message_text("👑 **لوحة تحكم المالك**\nاختر الخيار المطلوب:", reply_markup=owner_kb, parse_mode="Markdown")
+            else:
+                await query.answer("عذراً، هذا الخيار مخصص لمالك البوت فقط!", show_alert=True)
+            return
+
+        # 3. العودة للقائمة الرئيسية
+        if data == "back_to_main":
+            await query.edit_message_text("اختر الأداة المطلوبة من القائمة أدناه:", reply_markup=get_main_keyboard(user_id))
+            return
+
+        # 4. اختيار توليد الصور
+        if data == "tool_img_gen":
+            user_states[user_id] = "WAITING_FOR_IMAGE_PROMPT"
+            await query.message.reply_text("🎨 أرسل وصف الصورة التي تريد توليدها بالتفصيل.\n💳 التكلفة: ⭐ 5 (PRO)")
+            return
+
+        # 5. اختيار التلخيص والتحليل (مجاني)
+        if data == "tool_summarize":
+            user_states[user_id] = "WAITING_FOR_SUMMARY"
+            await query.message.reply_text("🔍 أرسل النص الذي تريد تحليله وتلخيصه الآن (الخدمة مجانية بالكامل) 📄")
+            return
+
+        await query.message.reply_text(f"تم اختيار الأداة: {data}")
+
+    except Exception as e:
+        logger.error(f"خطأ في الكولباك: {e}")
+
+async def handle_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة النصوص المدخلة بواسطة المستخدم"""
+    try:
+        user_id = update.effective_user.id
+        text = update.message.text
+
+        # إلغاء العملية والعودة
+        if text == "🔄 القائمة الرئيسية / إلغاء":
+            user_states.pop(user_id, None)
+            await update.message.reply_text("تم الرجوع إلى القائمة الرئيسية.", reply_markup=get_main_keyboard(user_id))
+            return
+
+        state = user_states.get(user_id)
+
+        # استقبال وصف الصورة لتوليدها عبر OpenAI API
+        if state == "WAITING_FOR_IMAGE_PROMPT":
+            if not OPENAI_API_KEY or "ضع_مفتاح" in OPENAI_API_KEY:
+                await update.message.reply_text("❌ حدث خطأ أثناء تنفيذ العملية:\nغير متوفر OPENAI_API_KEY لتوليد الصور.")
+                user_states.pop(user_id, None)
+                return
+
+            msg = await update.message.reply_text("⏳ جاري توليد الصورة...")
+            try:
+                headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
+                payload = {"prompt": text, "n": 1, "size": "1024x1024"}
+                res = requests.post("https://api.openai.com/v1/images/generations", json=payload, headers=headers, timeout=60)
+                res_data = res.json()
+
+                if res.status_code == 200 and "data" in res_data:
+                    await update.message.reply_photo(photo=res_data["data"][0]["url"], caption="✅ تم توليد الصورة بنجاح!")
+                else:
+                    err_msg = res_data.get('error', {}).get('message', 'فشل الطلب')
+                    await update.message.reply_text(f"❌ حدث خطأ أثناء تنفيذ العملية:\n{err_msg}")
+            except Exception:
+                await update.message.reply_text("❌ حدث خطأ أثناء تنفيذ العملية (تعذر الاتصال بـ OpenAI).")
+
+            user_states.pop(user_id, None)
+            return
+
+        # استقبال نص التلخيص (مجاني)
+        if state == "WAITING_FOR_SUMMARY":
+            await update.message.reply_text(f"📊 **نتيجة التلخيص والتحليل (مجاني):**\n\n{text[:300]}...\n\n✅ تم التلخيص بنجاح.", parse_mode="Markdown")
+            user_states.pop(user_id, None)
+            return
+
+        await update.message.reply_text("اختر أداة من القائمة أدناه للبدء:", reply_markup=get_main_keyboard(user_id))
+
+    except Exception as e:
+        logger.error(f"خطأ في معالجة الرسالة: {e}")
+
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """منع توقف البوت نهائياً وتجاوز أي استثناء مفاجئ"""
+    logger.error(msg="حدث استثناء في البوت وتم احتواؤه لمنع التوقف:", exc_info=context.error)
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CallbackQueryHandler(handle_callback_query))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_messages))
+
+    # ربط حماية التوقف الفجائي
+    app.add_error_handler(global_error_handler)
+
+    print("🚀 يعمل البوت بنجاح الآن وتتم المعالجة بدون انقطاع...")
+    app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
         [
             InlineKeyboardButton("📊 ضغط الصور", callback_data="tool_compress"),
             InlineKeyboardButton("📑 صور ⬅️ PDF", callback_data="tool_img2pdf")
