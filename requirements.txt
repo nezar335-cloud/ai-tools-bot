@@ -5,3 +5,4 @@ PyMuPDF
 edge-tts
 python-telegram-bot
 Flask
+openai
