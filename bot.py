@@ -550,7 +550,7 @@ async def callbacks(update, context):
         return
 
     if data == "free":
-        await q.edit_message_text("🆓 الأدوات المجانية\n\nيمكن للمالك نقل أي أداة إلى هنا بجعل سعرها ⭐0.", reply_markup=free_kb())
+        await q.edit_message_text("🆓 الادوات المجانيه", reply_markup=free_kb())
         return
 
     if data == "stars":
