@@ -3291,7 +3291,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()def get_main_keyboard(user_id):
+    main()
+def get_main_keyboard(user_id):
     keyboard = [
         [InlineKeyboardButton("--- 🆓 قسم الأدوات المجانية Free ---", callback_data="ignore")],
         [
