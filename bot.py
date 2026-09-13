@@ -1,3 +1,24 @@
+import os
+from threading import Thread
+from flask import Flask
+
+web_app = Flask('')
+
+@web_app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    web_app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.daemon = True
+    t.start()
+
+keep_alive()
+
 # AI TOOLS BOT - FREE-FIRST INTEGRATED VERSION
 # Uses OpenRouter for free text/vision tasks when available.
 # Optional: remove.bg for background removal, OpenAI for premium image/audio tasks.
