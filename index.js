@@ -10,7 +10,7 @@ const REMOVEBG_API_KEY = process.env.REMOVEBG_API_KEY;
 const OWNER_ID = Number(process.env.OWNER_ID) || 8860453018;
 
 if (!BOT_TOKEN) {
-    console.error("❌ BOT_TOKEN غير موجود في متغيرات البيئة!");
+    console.error("❌ BOT_TOKEN غير موجود!");
     process.exit(1);
 }
 
