@@ -10,7 +10,7 @@ const REMOVEBG_API_KEY = process.env.REMOVEBG_API_KEY;
 const OWNER_ID = Number(process.env.OWNER_ID) || 8860453018;
 
 if (!BOT_TOKEN) {
-    console.error("❌ BOT_TOKEN غير موجود!");
+    console.error("❌ BOT_TOKEN غير موجود في متغيرات البيئة!");
     process.exit(1);
 }
 
@@ -80,6 +80,7 @@ const mainKeyboard = (userId) => {
 };
 
 bot.start((ctx) => {
+    delete userState[ctx.from.id];
     const welcomeText = `أهلاً بك في AI Tools 👋\n\nاللهم صل وسلم وبارك على نبينا محمد ﷻ\n\nمجموعة من أدوات الذكاء الاصطناعي والوسائط في مكان واحد.\n\nاختر الخدمة التي تريدها من القائمة 👇`;
     return ctx.reply(welcomeText, mainKeyboard(ctx.from.id));
 });
@@ -134,38 +135,34 @@ const checkTool = async (ctx, toolName, action) => {
 
 bot.hears("🌐 الترجمة", (ctx) => checkTool(ctx, "🌐 الترجمة", () => {
     userState[ctx.from.id] = 'translate';
-    ctx.reply("🌐 أرسل النص الذي تريد ترجمته.");
+    ctx.reply("🌐 أرسل النص الذي تريد ترجمته إلى اللغة العربية.");
 }));
 
 bot.hears("🧠 المساعد الذكي", (ctx) => checkTool(ctx, "🧠 المساعد الذكي", () => {
     userState[ctx.from.id] = 'ai';
-    ctx.reply("🧠 اكتب سؤالك أو طلبك.");
+    ctx.reply("🧠 اكتب سؤالك أو استفسارك وسيتم الرد عليك فوراً.");
 }));
 
 bot.hears("🔊 تحويل النص إلى صوت", (ctx) => checkTool(ctx, "🔊 تحويل النص إلى صوت", () => {
     userState[ctx.from.id] = 'tts';
-    ctx.reply("🔊 أرسل النص الذي تريد تحويله إلى صوت.");
+    ctx.reply("🔊 أرسل النص الذي تريد تحويله إلى مقطع صوتي.");
 }));
 
 bot.hears("🎨 توليد الصور", (ctx) => checkTool(ctx, "🎨 توليد الصور", () => {
-    ctx.reply("🎨 أرسل وصف الصورة.");
+    userState[ctx.from.id] = 'gen_image';
+    ctx.reply("🎨 اكتب وصف الصورة المطلوبة باللغة الإنجليزية.");
 }));
 
 bot.hears("🖼️ إزالة الخلفية", (ctx) => checkTool(ctx, "🖼️ إزالة الخلفية", () => {
+    userState[ctx.from.id] = 'remove_bg';
     ctx.reply("🖼️ أرسل الصورة الآن لإزالة خلفيتها.");
 }));
 
-bot.hears("✨ تحسين الصور", (ctx) => checkTool(ctx, "✨ تحسين الصور", () => {
-    ctx.reply("🆓 أرسل الصورة لتحسين جودتها.");
-}));
-
-bot.hears("🖌️ تعديل الصور بالذكاء الاصطناعي", (ctx) => checkTool(ctx, "🖌️ تعديل الصور بالذكاء الاصطناعي", () => {
-    ctx.reply("🆓 أرسل الصورة والتعديل المطلوب.");
-}));
-
-bot.hears("⭐ رصيدي", (ctx) => ctx.reply("⭐ رصيدك الحالي: غير محدود (جميع الأدوات مجانية 🎁)."));
-bot.hears("💳 شراء نجوم", (ctx) => ctx.reply("ℹ️ جميع الأدوات مجانية حالياً دون الحاجة للشحن."));
-bot.hears("📞 التواصل مع المطور", (ctx) => ctx.reply("للتواصل مع المطور: @N_AiToolsBot"));
+bot.hears("✨ تحسين الصور", (ctx) => ctx.reply("🛠️ الأداة تحت الصيانة حالياً."));
+bot.hears("🖌️ تعديل الصور بالذكاء الاصطناعي", (ctx) => ctx.reply("🛠️ الأداة تحت الصيانة حالياً."));
+bot.hears("⭐ رصيدي", (ctx) => ctx.reply("⭐ جميع الخدمات والأدوات في البوت مجانية بالكامل!"));
+bot.hears("💳 شراء نجوم", (ctx) => ctx.reply("🎁 البوت مفتوح مجاناً لجميع المستخدمين."));
+bot.hears("📞 التواصل مع المطور", (ctx) => ctx.reply("للتواصل المباشر مع المطور: @N_AiToolsBot"));
 
 bot.on('text', async (ctx) => {
     const state = userState[ctx.from.id];
@@ -177,7 +174,7 @@ bot.on('text', async (ctx) => {
         try {
             const res = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=${encodeURIComponent(text)}`);
             delete userState[ctx.from.id];
-            return ctx.reply(`<b>الترجمة:</b>\n\n${res.data[0][0][0]}`, { parse_mode: 'HTML' });
+            return ctx.reply(`<b>🌐 الترجمة:</b>\n\n${res.data[0][0][0]}`, { parse_mode: 'HTML' });
         } catch (e) {
             return ctx.reply("❌ حدث خطأ أثناء الترجمة.");
         }
@@ -197,7 +194,7 @@ bot.on('text', async (ctx) => {
             delete userState[ctx.from.id];
             return ctx.reply(response.data.choices[0].message.content);
         } catch (e) {
-            return ctx.reply("❌ حدث خطأ في معالجة طلب الذكاء الاصطناعي.");
+            return ctx.reply("❌ حدث خطأ أثناء الاتصال بخدمة الذكاء الاصطناعي. تأكد من صحة المفاتيح.");
         }
     }
 
@@ -207,7 +204,49 @@ bot.on('text', async (ctx) => {
             delete userState[ctx.from.id];
             return ctx.replyWithAudio({ url: url, filename: 'voice.mp3' });
         } catch (e) {
-            return ctx.reply("❌ حدث خطأ في تحويل الصوت.");
+            return ctx.reply("❌ حدث خطأ أثناء تحويل الصوت.");
+        }
+    }
+
+    if (state === 'gen_image') {
+        try {
+            ctx.reply("🎨 جاري رسم الصورة...");
+            const res = await axios.post('https://api.openai.com/v1/images/generations', {
+                prompt: text,
+                n: 1,
+                size: "512x512"
+            }, {
+                headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` }
+            });
+            delete userState[ctx.from.id];
+            return ctx.replyWithPhoto(res.data.data[0].url);
+        } catch (e) {
+            return ctx.reply("❌ حدث خطأ في توليد الصورة. تأكد من مفتاح OpenAI.");
+        }
+    }
+});
+
+bot.on('photo', async (ctx) => {
+    const state = userState[ctx.from.id];
+    if (state === 'remove_bg') {
+        try {
+            ctx.reply("⏳ جاري إزالة الخلفية...");
+            const photoArray = ctx.message.photo;
+            const fileId = photoArray[photoArray.length - 1].file_id;
+            const fileLink = await ctx.telegram.getFileLink(fileId);
+
+            const response = await axios.post('https://api.remove.bg/v1.0/removebg', {
+                image_url: fileLink.href,
+                size: 'auto'
+            }, {
+                headers: { 'X-Api-Key': REMOVEBG_API_KEY },
+                responseType: 'arraybuffer'
+            });
+
+            delete userState[ctx.from.id];
+            return ctx.replyWithDocument({ source: Buffer.from(response.data), filename: 'no-bg.png' });
+        } catch (e) {
+            return ctx.reply("❌ حدث خطأ أثناء إزالة الخلفية. تأكد من مفتاح Remove.bg.");
         }
     }
 });
