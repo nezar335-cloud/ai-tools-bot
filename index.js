@@ -3,7 +3,6 @@ const axios = require('axios');
 const fs = require('fs');
 const googleTTS = require('google-tts-api');
 
-// جلب المفاتيح من بيئة التشغيل
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -17,9 +16,8 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 const DB_FILE = './database.json';
-const userState = {}; // متابعة حالة المستخدم للرد على الأدوات
+const userState = {};
 
-// إدارة قاعدة البيانات
 function loadDB() {
     if (!fs.existsSync(DB_FILE)) {
         const defaultDB = {
@@ -64,7 +62,6 @@ async function getTools() {
     return db.tools;
 }
 
-// القوائم واللوحات
 const mainKeyboard = (userId) => {
     const buttons = [
         ["🖼️ إزالة الخلفية", "🌐 الترجمة"],
@@ -82,24 +79,11 @@ const mainKeyboard = (userId) => {
     return Markup.keyboard(buttons).resize();
 };
 
-// الأمر /start
 bot.start((ctx) => {
     const welcomeText = `أهلاً بك في AI Tools 👋\n\nاللهم صل وسلم وبارك على نبينا محمد ﷻ\n\nمجموعة من أدوات الذكاء الاصطناعي والوسائط في مكان واحد.\n\nاختر الخدمة التي تريدها من القائمة 👇`;
     return ctx.reply(welcomeText, mainKeyboard(ctx.from.id));
 });
 
-// اختبار الخدمة /test
-bot.command('test', (ctx) => {
-    const status = `🔑 **اختبار اتصال الخدمات:**\n\n` +
-        `${OPENROUTER_API_KEY ? "🟢 OpenRouter: متصل" : "🔴 OpenRouter: غير متاح"}\n` +
-        `${OPENAI_API_KEY ? "🟢 OpenAI: متصل" : "🔴 OpenAI: غير متاح"}\n` +
-        `${REMOVEBG_API_KEY ? "🟢 Remove.bg: متصل" : "🔴 Remove.bg: غير متاح"}\n` +
-        `🟢 Google TTS: متاح\n\n` +
-        `⚠️ لا يتم عرض مفاتيح API.`;
-    return ctx.replyWithMarkdown(status);
-});
-
-// لوحة التحكم
 bot.hears("👑 لوحة التحكم", (ctx) => {
     if (!isOwner(ctx)) return ctx.reply("❌ هذا الأمر مخصص للمالك فقط.");
     const ownerMenu = Markup.keyboard([
@@ -121,7 +105,6 @@ bot.hears("⚙️ إدارة تفعيل/تعطيل الأدوات", async (ctx) 
     return ctx.reply(text, Markup.keyboard(toggleButtons).resize());
 });
 
-// معالجة مفاتيح التبديل
 bot.use(async (ctx, next) => {
     const text = ctx.message?.text;
     if (text && toolToggleMap[text]) {
@@ -141,7 +124,6 @@ bot.hears("🔙 القائمة الرئيسية", (ctx) => {
     return ctx.reply("العودة للقائمة الرئيسية:", mainKeyboard(ctx.from.id));
 });
 
-// التحقق من تفعيل الأداة
 const checkTool = async (ctx, toolName, action) => {
     const tools = await getTools();
     if (tools[toolName] === false) {
@@ -150,29 +132,26 @@ const checkTool = async (ctx, toolName, action) => {
     action();
 };
 
-// أزرار الأدوات والتنفيذ الفعلي
 bot.hears("🌐 الترجمة", (ctx) => checkTool(ctx, "🌐 الترجمة", () => {
     userState[ctx.from.id] = 'translate';
-    ctx.reply("🌐 أرسل النص الذي تريد ترجمته.\n\nسأكتشف اللغة وأترجمها تلقائياً.");
+    ctx.reply("🌐 أرسل النص الذي تريد ترجمته.");
 }));
 
 bot.hears("🧠 المساعد الذكي", (ctx) => checkTool(ctx, "🧠 المساعد الذكي", () => {
     userState[ctx.from.id] = 'ai';
-    ctx.reply("🧠 اكتب سؤالك أو طلبك.\n\nالسعر: مجاني 🎁");
+    ctx.reply("🧠 اكتب سؤالك أو طلبك.");
 }));
 
 bot.hears("🔊 تحويل النص إلى صوت", (ctx) => checkTool(ctx, "🔊 تحويل النص إلى صوت", () => {
     userState[ctx.from.id] = 'tts';
-    ctx.reply("🔊 أرسل النص الذي تريد تحويله إلى صوت.\n\nالسعر: مجاني 🎁");
+    ctx.reply("🔊 أرسل النص الذي تريد تحويله إلى صوت.");
 }));
 
 bot.hears("🎨 توليد الصور", (ctx) => checkTool(ctx, "🎨 توليد الصور", () => {
-    userState[ctx.from.id] = 'gen_image';
-    ctx.reply("🎨 اكتب وصف الصورة التي تريد توليدها باللغة الإنجليزية أو العربية:");
+    ctx.reply("🎨 أرسل وصف الصورة.");
 }));
 
 bot.hears("🖼️ إزالة الخلفية", (ctx) => checkTool(ctx, "🖼️ إزالة الخلفية", () => {
-    userState[ctx.from.id] = 'remove_bg';
     ctx.reply("🖼️ أرسل الصورة الآن لإزالة خلفيتها.");
 }));
 
@@ -188,30 +167,24 @@ bot.hears("⭐ رصيدي", (ctx) => ctx.reply("⭐ رصيدك الحالي: غ�
 bot.hears("💳 شراء نجوم", (ctx) => ctx.reply("ℹ️ جميع الأدوات مجانية حالياً دون الحاجة للشحن."));
 bot.hears("📞 التواصل مع المطور", (ctx) => ctx.reply("للتواصل مع المطور: @N_AiToolsBot"));
 
-// معالجة النصوص المرسلة من المستخدم حسب الحالة Active State
 bot.on('text', async (ctx) => {
     const state = userState[ctx.from.id];
     const text = ctx.message.text;
 
     if (!state) return;
 
-    // 1. معالجة الترجمة
     if (state === 'translate') {
         try {
-            ctx.reply("⏳ جاري الترجمة...");
             const res = await axios.get(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q=${encodeURIComponent(text)}`);
-            const translatedText = res.data[0][0][0];
             delete userState[ctx.from.id];
-            return ctx.reply(`<b>الترجمة:</b>\n\n${translatedText}`, { parse_mode: 'HTML' });
+            return ctx.reply(`<b>الترجمة:</b>\n\n${res.data[0][0][0]}`, { parse_mode: 'HTML' });
         } catch (e) {
-            return ctx.reply("❌ حدث خطأ أثناء الترجمة، حاول مرة أخرى.");
+            return ctx.reply("❌ حدث خطأ أثناء الترجمة.");
         }
     }
 
-    // 2. معالجة المساعد الذكي (OpenRouter / OpenAI)
     if (state === 'ai') {
         try {
-            ctx.reply("⏳ جاري التفكير...");
             const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
                 model: 'google/gemini-2.5-flash',
                 messages: [{ role: 'user', content: text }]
@@ -221,32 +194,24 @@ bot.on('text', async (ctx) => {
                     'Content-Type': 'application/json'
                 }
             });
-            const replyMsg = response.data.choices[0].message.content;
             delete userState[ctx.from.id];
-            return ctx.reply(replyMsg);
+            return ctx.reply(response.data.choices[0].message.content);
         } catch (e) {
-            return ctx.reply("❌ حدث خطأ أثناء تنفيذ العملية. تأكد من صحة مفاتيح الـ API.");
+            return ctx.reply("❌ حدث خطأ في معالجة طلب الذكاء الاصطناعي.");
         }
     }
 
-    // 3. معالجة تحويل النص إلى صوت (Google TTS)
     if (state === 'tts') {
         try {
-            ctx.reply("⏳ جاري تحويل النص إلى صوت...");
-            const url = googleTTS.getAudioUrl(text, {
-                lang: 'ar',
-                slow: false,
-                host: 'https://translate.google.com',
-            });
+            const url = googleTTS.getAudioUrl(text, { lang: 'ar', slow: false, host: 'https://translate.google.com' });
             delete userState[ctx.from.id];
             return ctx.replyWithAudio({ url: url, filename: 'voice.mp3' });
         } catch (e) {
-            return ctx.reply("❌ حدث خطأ أثناء تحويل النص إلى صوت.");
+            return ctx.reply("❌ حدث خطأ في تحويل الصوت.");
         }
     }
 });
 
-// تشغيل البوت
 bot.launch().then(() => console.log("🤖 AI Tools Bot is Running Successfully!")).catch(err => console.error("Error launching bot:", err));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
