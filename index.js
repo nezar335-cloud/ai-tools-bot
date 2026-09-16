@@ -1,18 +1,16 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const axios = require('axios');
 
-// قراءة المفاتيح آمنة من متغيرات البيئة
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const OWNER_ID = 8860453018;
+const OWNER_ID = Number(process.env.OWNER_ID) || 8860453018;
 
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const REMOVEBG_KEY = process.env.REMOVEBG_API_KEY;
+if (!BOT_TOKEN) {
+    console.error("❌ BOT_TOKEN غير موجود في Variables!");
+    process.exit(1);
+}
 
 const bot = new Telegraf(BOT_TOKEN);
 const DB_FILE = './database.json';
-const userState = new Map();
 
 function loadDB() {
     if (!fs.existsSync(DB_FILE)) {
@@ -30,10 +28,122 @@ function loadDB() {
         fs.writeFileSync(DB_FILE, JSON.stringify(defaultDB, null, 2));
         return defaultDB;
     }
-    try {
-        return JSON.parse(fs.readFileSync(DB_FILE));
-    } catch (e) {
-        return { tools: {} };
+    return JSON.parse(fs.readFileSync(DB_FILE));
+}
+
+function saveDB(data) {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
+
+const isOwner = (ctx) => ctx.from && Number(ctx.from.id) === OWNER_ID;
+
+const toolToggleMap = {
+    "إلغاء/تفعيل إزالة الخلفية": "🖼️ إزالة الخلفية",
+    "إلغاء/تفعيل الترجمة": "🌐 الترجمة",
+    "إلغاء/تفعيل تحسين الصور": "✨ تحسين الصور",
+    "إلغاء/تفعيل توليد الصور": "🎨 توليد الصور",
+    "إلغاء/تفعيل تعديل الصور": "🖌️ تعديل الصور بالذكاء الاصطناعي",
+    "إلغاء/تفعيل المساعد الذكي": "🧠 المساعد الذكي",
+    "إلغاء/تفعيل تحويل النص لصوت": "🔊 تحويل النص إلى صوت"
+};
+
+async function getTools() {
+    const db = loadDB();
+    return db.tools;
+}
+
+const mainKeyboard = (userId) => {
+    const buttons = [
+        ["🖼️ إزالة الخلفية", "🌐 الترجمة"],
+        ["✨ تحسين الصور", "🎨 توليد الصور"],
+        ["🖌️ تعديل الصور بالذكاء الاصطناعي"],
+        ["🧠 المساعد الذكي", "🔊 تحويل النص إلى صوت"],
+        ["💳 شراء نجوم", "⭐ رصيدي"],
+        ["📞 التواصل مع المطور"]
+    ];
+
+    if (Number(userId) === OWNER_ID) {
+        buttons.push(["👑 لوحة التحكم"]);
+    }
+
+    return Markup.keyboard(buttons).resize();
+};
+
+bot.start((ctx) => {
+    const welcomeText = `أهلاً بك في AI Tools 👋\n\nاللهم صل وسلم وبارك على نبينا محمد ﷻ\n\nمجموعة من أدوات الذكاء الاصطناعي والوسائط في مكان واحد.\n\nاختر الخدمة التي تريدها من القائمة 👇`;
+    return ctx.reply(welcomeText, mainKeyboard(ctx.from.id));
+});
+
+bot.hears("👑 لوحة التحكم", async (ctx) => {
+    if (!isOwner(ctx)) return ctx.reply("❌ هذا الأمر مخصص للمالك فقط.");
+
+    const ownerMenu = Markup.keyboard([
+        ["⚙️ إدارة تفعيل/تعطيل الأدوات"],
+        ["📊 الإحصائيات"],
+        ["🔙 القائمة الرئيسية"]
+    ]).resize();
+
+    return ctx.reply("👑 أهلاً بك في لوحة تحكم المالك:", ownerMenu);
+});
+
+bot.hears("⚙️ إدارة تفعيل/تعطيل الأدوات", async (ctx) => {
+    if (!isOwner(ctx)) return;
+    const tools = await getTools();
+
+    let text = "⚙️ **حالة الأدوات الحالية:**\n\n";
+    for (const [toolName, status] of Object.entries(tools)) {
+        text += `${toolName}: ${status ? "✅ مفعلة" : "❌ معطلة"}\n`;
+    }
+
+    const toggleButtons = Object.keys(toolToggleMap).map(btnText => [btnText]);
+    toggleButtons.push(["🔙 القائمة الرئيسية"]);
+
+    return ctx.reply(text, Markup.keyboard(toggleButtons).resize());
+});
+
+bot.use(async (ctx, next) => {
+    const text = ctx.message?.text;
+    if (text && toolToggleMap[text]) {
+        if (!isOwner(ctx)) return ctx.reply("❌ غير مسموح لك.");
+
+        const targetTool = toolToggleMap[text];
+        const db = loadDB();
+
+        db.tools[targetTool] = !db.tools[targetTool];
+        saveDB(db);
+
+        const newStatus = db.tools[targetTool] ? "✅ تم التفعيل" : "❌ تم التعطيل";
+        return ctx.reply(`تم تغيير حالة أداة (${targetTool}) إلى: ${newStatus}`);
+    }
+    return next();
+});
+
+bot.hears("🔙 القائمة الرئيسية", (ctx) => ctx.reply("العودة للقائمة الرئيسية:", mainKeyboard(ctx.from.id)));
+
+const checkToolActive = async (ctx, toolName, handler) => {
+    const tools = await getTools();
+    if (tools[toolName] === false) {
+        return ctx.reply(`⚠️ أداة (${toolName}) معطلة حالياً من قبل الإدارة.`);
+    }
+    return handler(ctx);
+};
+
+bot.hears("🖼️ إزالة الخلفية", (ctx) => checkToolActive(ctx, "🖼️ إزالة الخلفية", (c) => c.reply("🆓 هذه الأداة مجانية! أرسل الصورة الآن.")));
+bot.hears("🌐 الترجمة", (ctx) => checkToolActive(ctx, "🌐 الترجمة", (c) => c.reply("🆓 أرسل النص المراد ترجمته.")));
+bot.hears("✨ تحسين الصور", (ctx) => checkToolActive(ctx, "✨ تحسين الصور", (c) => c.reply("🆓 أرسل الصورة لتحسين جودتها.")));
+bot.hears("🎨 توليد الصور", (ctx) => checkToolActive(ctx, "🎨 توليد الصور", (c) => c.reply("🆓 اكتب وصف الصورة لتوليدها.")));
+bot.hears("🖌️ تعديل الصور بالذكاء الاصطناعي", (ctx) => checkToolActive(ctx, "🖌️ تعديل الصور بالذكاء الاصطناعي", (c) => c.reply("🆓 أرسل الصورة للبدء بالتعديل.")));
+bot.hears("🧠 المساعد الذكي", (ctx) => checkToolActive(ctx, "🧠 المساعد الذكي", (c) => c.reply("🆓 أهلاً بك! اكتب سؤالك فوراً.")));
+bot.hears("🔊 تحويل النص إلى صوت", (ctx) => checkToolActive(ctx, "🔊 تحويل النص إلى صوت", (c) => c.reply("🆓 أرسل النص لتحويله لصوت.")));
+
+bot.hears("⭐ رصيدي", (ctx) => ctx.reply("⭐ رصيدك الحالي: غير محدود (جميع الأدوات مجانية 🎁)."));
+bot.hears("💳 شراء نجوم", (ctx) => ctx.reply("ℹ️ جميع الأدوات مجانية حالياً دون الحاجة للشحن."));
+bot.hears("📞 التواصل مع المطور", (ctx) => ctx.reply("للتواصل مع المطور عبر تليجرام."));
+
+bot.launch().then(() => console.log("🤖 AI Tools Bot is running..."));
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
     }
 }
 
