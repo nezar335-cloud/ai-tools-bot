@@ -1,8 +1,0 @@
-aiogram
-httpx
-Pillow
-PyMuPDF
-edge-tts
-python-telegram-bot
-Flask
-openai
