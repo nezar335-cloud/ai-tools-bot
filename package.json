@@ -1,17 +1,12 @@
 {
-  "name": "ai-tools-bot",
+  "name": "experiences-games-bot",
   "version": "1.0.0",
-  "description": "AI Tools Telegram Bot",
+  "description": "Experiences Telegram Games Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "telegraf": "^4.15.3",
-    "axios": "^1.6.8",
-    "google-tts-api": "^2.0.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "telegraf": "^4.16.3"
   }
 }
